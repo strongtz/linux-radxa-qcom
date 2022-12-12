@@ -1913,6 +1913,8 @@ patternProperties:
     description: Wondermedia Technologies, Inc.
   "^wobo,.*":
     description: Wobo
+  "^worldsemi,.*":
+    description: WorldSemi Co., Limited
   "^wolfvision,.*":
     description: WolfVision GmbH
   "^x-powers,.*":
