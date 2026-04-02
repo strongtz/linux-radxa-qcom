@@ -2,12 +2,25 @@
 // Copyright (c) 2018-2023, Linaro Limited.
 // Copyright (c) 2018, The Linux Foundation. All rights reserved.
 
+#include <dt-bindings/sound/qcom,lpass.h>
 #include <dt-bindings/sound/qcom,q6afe.h>
 #include <linux/module.h>
 #include <sound/soc.h>
+#include "lpass.h"
 #include "sdw.h"
 
-static bool qcom_snd_is_sdw_dai(int id)
+static bool qcom_snd_is_lpass_sdw_dai(const struct snd_soc_dai *cpu_dai)
+{
+	if (!cpu_dai || !cpu_dai->driver)
+		return false;
+
+	if (cpu_dai->driver->ops != &asoc_qcom_lpass_cdc_dma_dai_ops)
+		return false;
+
+	return is_rxtx_cdc_dma_port(cpu_dai->id);
+}
+
+static bool qcom_snd_is_legacy_sdw_dai(int id)
 {
 	switch (id) {
 	case WSA_CODEC_DMA_RX_0:
@@ -38,6 +51,17 @@ static bool qcom_snd_is_sdw_dai(int id)
 	return false;
 }
 
+static bool qcom_snd_is_sdw_dai(const struct snd_soc_dai *cpu_dai)
+{
+	if (!cpu_dai)
+		return false;
+
+	if (qcom_snd_is_lpass_sdw_dai(cpu_dai))
+		return true;
+
+	return qcom_snd_is_legacy_sdw_dai(cpu_dai->id);
+}
+
 /**
  * qcom_snd_sdw_startup() - Helper to start Soundwire stream for SoC audio card
  * @substream: The PCM substream from audio, as passed to snd_soc_ops->startup()
@@ -60,7 +84,7 @@ int qcom_snd_sdw_startup(struct snd_pcm_substream *substream)
 	u32 rx_ch_cnt = 0, tx_ch_cnt = 0;
 	int ret, i, j;
 
-	if (!qcom_snd_is_sdw_dai(cpu_dai->id))
+	if (!qcom_snd_is_sdw_dai(cpu_dai))
 		return 0;
 
 	sruntime = sdw_alloc_stream(cpu_dai->name, SDW_STREAM_PCM);
@@ -123,7 +147,7 @@ int qcom_snd_sdw_prepare(struct snd_pcm_substream *substream,
 	if (!sruntime)
 		return 0;
 
-	if (!qcom_snd_is_sdw_dai(cpu_dai->id))
+	if (!qcom_snd_is_sdw_dai(cpu_dai))
 		return 0;
 
 	if (*stream_prepared)
@@ -160,7 +184,7 @@ struct sdw_stream_runtime *qcom_snd_sdw_get_stream(struct snd_pcm_substream *sub
 	struct sdw_stream_runtime *sruntime;
 	int i;
 
-	if (!qcom_snd_is_sdw_dai(cpu_dai->id))
+	if (!qcom_snd_is_sdw_dai(cpu_dai))
 		return NULL;
 
 	for_each_rtd_codec_dais(rtd, i, codec_dai) {
@@ -189,7 +213,7 @@ int qcom_snd_sdw_hw_free(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 
-	if (!qcom_snd_is_sdw_dai(cpu_dai->id))
+	if (!qcom_snd_is_sdw_dai(cpu_dai))
 		return 0;
 
 	if (sruntime && *stream_prepared) {
