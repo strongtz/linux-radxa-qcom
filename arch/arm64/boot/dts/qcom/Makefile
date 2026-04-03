@@ -130,6 +130,9 @@ dtb-$(CONFIG_ARCH_QCOM)	+= qcs6490-radxa-dragon-q6a.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= qcs6490-radxa-dragon-q6a-lpass-cpu.dtb
 qcs6490-radxa-dragon-q6a-kvm-dtbs	:= qcs6490-radxa-dragon-q6a.dtb qcs6490-radxa-dragon-q6a-kvm.dtbo
 dtb-$(CONFIG_ARCH_QCOM)	+= qcs6490-radxa-dragon-q6a-kvm.dtb
+qcs6490-radxa-dragon-q6a-lpass-cpu-pcm5102a-dtbs	:= qcs6490-radxa-dragon-q6a-lpass-cpu.dtb qcs6490-radxa-dragon-q6a-lpass-cpu-pcm5102a.dtbo
+dtb-$(CONFIG_ARCH_QCOM)	+= qcs6490-radxa-dragon-q6a-lpass-cpu-pcm5102a.dtb
+
 dtb-$(CONFIG_ARCH_QCOM)	+= qcs6490-rb3gen2.dtb
 
 qcs6490-rb3gen2-vision-mezzanine-dtbs := qcs6490-rb3gen2.dtb qcs6490-rb3gen2-vision-mezzanine.dtbo

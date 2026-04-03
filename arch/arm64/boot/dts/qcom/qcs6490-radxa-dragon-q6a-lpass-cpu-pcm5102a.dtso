@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2026 Radxa Computer (Shenzhen) Co., Ltd.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/sound/qcom,lpass.h>
+
+&{/} {
+	pcm5102a: audio-codec {
+		compatible = "ti,pcm5102a";
+		#sound-dai-cells = <0>;
+	};
+
+	sound_pcm5102a: sound-pcm5102a {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "QCS6490-PCM5102A";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,mclk-fs = <256>;
+		simple-audio-card,bitclock-master = <&sound_pcm5102a_cpu>;
+		simple-audio-card,frame-master = <&sound_pcm5102a_cpu>;
+
+		sound_pcm5102a_cpu: simple-audio-card,cpu {
+			sound-dai = <&lpass_cpu MI2S_PRIMARY>;
+			system-clock-frequency = <12288000>;
+			system-clock-direction-out;
+		};
+
+		simple-audio-card,codec {
+			sound-dai = <&pcm5102a>;
+		};
+	};
+};
+
+&lpass_cpu {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mi2s0_data1>, <&mi2s0_mclk>, <&mi2s0_sclk>, <&mi2s0_ws>;
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	dai-link@0 {
+		reg = <MI2S_PRIMARY>;
+		qcom,playback-sd-lines = <1>;
+	};
+};
+
+&mi2s0_data0 {
+	drive-strength = <6>;
+	bias-disable;
+};
+
+&mi2s0_data1 {
+	drive-strength = <6>;
+	bias-disable;
+};
+
+&mi2s0_mclk {
+	drive-strength = <6>;
+	bias-disable;
+};
+
+&mi2s0_sclk {
+	drive-strength = <6>;
+	bias-disable;
+};
+
+&mi2s0_ws {
+	drive-strength = <6>;
+	bias-disable;
+};
