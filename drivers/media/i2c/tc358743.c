@@ -96,6 +96,9 @@ struct tc358743_state {
 	struct v4l2_ctrl *audio_sampling_rate_ctrl;
 	struct v4l2_ctrl *audio_present_ctrl;
 
+	/* link frequency from DT endpoint */
+	s64 link_freq;
+
 	struct delayed_work delayed_work_enable_hotplug;
 
 	struct timer_list timer;
@@ -141,26 +144,26 @@ static int i2c_rd(struct v4l2_subdev *sd, u16 reg, u8 *values, u32 n)
 
 	while (n > 0) {
 		u32 chunk = min(n, max_len);
-	u8 buf[2] = { reg >> 8, reg & 0xff };
-	struct i2c_msg msgs[] = {
-		{
-			.addr = client->addr,
-			.flags = 0,
-			.len = 2,
-			.buf = buf,
-		},
-		{
-			.addr = client->addr,
-			.flags = I2C_M_RD,
+		u8 buf[2] = { reg >> 8, reg & 0xff };
+		struct i2c_msg msgs[] = {
+			{
+				.addr = client->addr,
+				.flags = 0,
+				.len = 2,
+				.buf = buf,
+			},
+			{
+				.addr = client->addr,
+				.flags = I2C_M_RD,
 				.len = chunk,
-			.buf = values,
-		},
-	};
+				.buf = values,
+			},
+		};
 
-	err = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
-	if (err != ARRAY_SIZE(msgs)) {
-		v4l2_err(sd, "%s: reading register 0x%x from 0x%x failed: %d\n",
-				__func__, reg, client->addr, err);
+		err = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
+		if (err != ARRAY_SIZE(msgs)) {
+			v4l2_err(sd, "%s: reading register 0x%x from 0x%x failed: %d\n",
+					__func__, reg, client->addr, err);
 			return -1;
 		}
 
@@ -193,22 +196,22 @@ static void i2c_wr(struct v4l2_subdev *sd, u16 reg, u8 *values, u32 n)
 	while (n > 0) {
 		u32 chunk = min(n, max_len);
 
-	msg.addr = client->addr;
-	msg.buf = data;
+		msg.addr = client->addr;
+		msg.buf = data;
 		msg.len = 2 + chunk;
-	msg.flags = 0;
+		msg.flags = 0;
 
-	data[0] = reg >> 8;
-	data[1] = reg & 0xff;
+		data[0] = reg >> 8;
+		data[1] = reg & 0xff;
 
 		for (i = 0; i < chunk; i++)
-		data[2 + i] = values[i];
+			data[2 + i] = values[i];
 
-	err = i2c_transfer(client->adapter, &msg, 1);
-	if (err != 1) {
-		v4l2_err(sd, "%s: writing register 0x%x from 0x%x failed: %d\n",
-				__func__, reg, client->addr, err);
-		return;
+		err = i2c_transfer(client->adapter, &msg, 1);
+		if (err != 1) {
+			v4l2_err(sd, "%s: writing register 0x%x from 0x%x failed: %d\n",
+					__func__, reg, client->addr, err);
+			return;
 		}
 
 		values += chunk;
@@ -2072,6 +2075,7 @@ static int tc358743_probe_of(struct tc358743_state *state)
 	}
 
 	state->bus = endpoint.bus.mipi_csi2;
+	state->link_freq = endpoint.link_frequencies[0];
 
 	ret = clk_prepare_enable(refclk);
 	if (ret) {
@@ -2242,7 +2246,7 @@ static int tc358743_probe(struct i2c_client *client)
 	}
 
 	/* control handlers */
-	v4l2_ctrl_handler_init(&state->hdl, 3);
+	v4l2_ctrl_handler_init(&state->hdl, 4);
 
 	state->detect_tx_5v_ctrl = v4l2_ctrl_new_std(&state->hdl, NULL,
 			V4L2_CID_DV_RX_POWER_PRESENT, 0, 1, 0, 0);
@@ -2253,6 +2257,15 @@ static int tc358743_probe(struct i2c_client *client)
 
 	state->audio_present_ctrl = v4l2_ctrl_new_custom(&state->hdl,
 			&tc358743_ctrl_audio_present, NULL);
+
+	if (state->link_freq) {
+		struct v4l2_ctrl *ctrl;
+
+		ctrl = v4l2_ctrl_new_int_menu(&state->hdl, NULL,
+				V4L2_CID_LINK_FREQ, 0, 0, &state->link_freq);
+		if (ctrl)
+			ctrl->flags |= V4L2_CTRL_FLAG_READ_ONLY;
+	}
 
 	sd->ctrl_handler = &state->hdl;
 	if (state->hdl.error) {
