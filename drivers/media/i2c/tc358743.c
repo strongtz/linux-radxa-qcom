@@ -132,7 +132,15 @@ static int i2c_rd(struct v4l2_subdev *sd, u16 reg, u8 *values, u32 n)
 {
 	struct tc358743_state *state = to_state(sd);
 	struct i2c_client *client = state->i2c_client;
+	const struct i2c_adapter_quirks *quirks = client->adapter->quirks;
+	u32 max_len = n;
 	int err;
+
+	if (quirks && quirks->max_read_len)
+		max_len = quirks->max_read_len;
+
+	while (n > 0) {
+		u32 chunk = min(n, max_len);
 	u8 buf[2] = { reg >> 8, reg & 0xff };
 	struct i2c_msg msgs[] = {
 		{
@@ -144,7 +152,7 @@ static int i2c_rd(struct v4l2_subdev *sd, u16 reg, u8 *values, u32 n)
 		{
 			.addr = client->addr,
 			.flags = I2C_M_RD,
-			.len = n,
+				.len = chunk,
 			.buf = values,
 		},
 	};
@@ -153,33 +161,47 @@ static int i2c_rd(struct v4l2_subdev *sd, u16 reg, u8 *values, u32 n)
 	if (err != ARRAY_SIZE(msgs)) {
 		v4l2_err(sd, "%s: reading register 0x%x from 0x%x failed: %d\n",
 				__func__, reg, client->addr, err);
+			return -1;
+		}
+
+		values += chunk;
+		reg += chunk;
+		n -= chunk;
 	}
-	return err != ARRAY_SIZE(msgs);
+
+	return 0;
 }
 
 static void i2c_wr(struct v4l2_subdev *sd, u16 reg, u8 *values, u32 n)
 {
 	struct tc358743_state *state = to_state(sd);
 	struct i2c_client *client = state->i2c_client;
+	u32 max_len = I2C_MAX_XFER_SIZE - 2;
 	int err, i;
 	struct i2c_msg msg;
 	u8 data[I2C_MAX_XFER_SIZE];
+	const struct i2c_adapter_quirks *quirks = client->adapter->quirks;
 
-	if ((2 + n) > I2C_MAX_XFER_SIZE) {
-		n = I2C_MAX_XFER_SIZE - 2;
-		v4l2_warn(sd, "i2c wr reg=%04x: len=%d is too big!\n",
-			  reg, 2 + n);
-	}
+	/*
+	 * Some I2C adapters (e.g. Qualcomm CCI) have a very small max write
+	 * length. Split large writes (such as EDID blocks) into chunks that
+	 * fit the adapter's limits.
+	 */
+	if (quirks && quirks->max_write_len)
+		max_len = min_t(u32, max_len, quirks->max_write_len - 2);
+
+	while (n > 0) {
+		u32 chunk = min(n, max_len);
 
 	msg.addr = client->addr;
 	msg.buf = data;
-	msg.len = 2 + n;
+		msg.len = 2 + chunk;
 	msg.flags = 0;
 
 	data[0] = reg >> 8;
 	data[1] = reg & 0xff;
 
-	for (i = 0; i < n; i++)
+		for (i = 0; i < chunk; i++)
 		data[2 + i] = values[i];
 
 	err = i2c_transfer(client->adapter, &msg, 1);
@@ -187,6 +209,11 @@ static void i2c_wr(struct v4l2_subdev *sd, u16 reg, u8 *values, u32 n)
 		v4l2_err(sd, "%s: writing register 0x%x from 0x%x failed: %d\n",
 				__func__, reg, client->addr, err);
 		return;
+		}
+
+		values += chunk;
+		reg += chunk;
+		n -= chunk;
 	}
 
 	if (debug < 3)
