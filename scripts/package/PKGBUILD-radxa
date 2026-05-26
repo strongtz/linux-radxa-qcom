@@ -5,7 +5,7 @@
 pkgbase=${PACMAN_PKGBASE:-linux-radxa-qcom}
 pkgname=("${pkgbase}")
 
-_extrapackages=${PACMAN_EXTRAPACKAGES-headers api-headers}
+_extrapackages=${PACMAN_EXTRAPACKAGES-headers api-headers dtbs}
 for pkg in $_extrapackages; do
 	pkgname+=("${pkgbase}-${pkg}")
 done
@@ -69,12 +69,6 @@ _package() {
 	${MAKE} INSTALL_MOD_PATH="${pkgdir}/usr" INSTALL_MOD_STRIP=1 \
 		DEPMOD=true modules_install
 
-	if [ -d "${srctree}/arch/${SRCARCH}/boot/dts" ]; then
-		echo "Installing dtbs..."
-		${MAKE} INSTALL_DTBS_PATH="${modulesdir}/dtb" dtbs_install
-        ${MAKE} INSTALL_DTBS_PATH="${pkgdir}/boot/dtb" dtbs_install
-	fi
-
 	# remove build link, will be part of -headers package
 	rm -f "${modulesdir}/build"
 }
@@ -109,6 +103,21 @@ _package-api-headers() {
 	_prologue
 
 	${MAKE} headers_install INSTALL_HDR_PATH="${pkgdir}/usr"
+}
+
+_package-dtbs() {
+	pkgdesc="Device tree binaries for the $pkgdesc kernel"
+	arch=(aarch64)
+	depends=(kernel-dtbs-hook)
+
+	local modulesdir="${pkgdir}/usr/lib/modules/${KERNELRELEASE}"
+	local dtbdir="$modulesdir/dtb"
+
+	_prologue
+
+	echo "Installing device tree binaries..."
+	mkdir -p "$dtbdir"
+	${MAKE} INSTALL_DTBS_PATH="$dtbdir" dtbs_install
 }
 
 for _p in "${pkgname[@]}"; do
