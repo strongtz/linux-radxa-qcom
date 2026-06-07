@@ -6,9 +6,12 @@
 #ifndef __IRIS_HFI_GEN1_H__
 #define __IRIS_HFI_GEN1_H__
 
+#include <linux/types.h>
+
 struct iris_core;
 
 void iris_hfi_gen1_sys_ops_init(struct iris_core *core);
+void iris_hfi_gen1_flush_debug_queue(struct iris_core *core, u8 *packet);
 void iris_hfi_gen1_response_handler(struct iris_core *core);
 
 #endif

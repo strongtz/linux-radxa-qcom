@@ -6,6 +6,8 @@
 #ifndef __IRIS_HFI_GEN2_H__
 #define __IRIS_HFI_GEN2_H__
 
+#include <linux/types.h>
+
 #include "iris_instance.h"
 
 struct iris_core;
@@ -35,6 +37,7 @@ struct iris_inst_hfi_gen2 {
 };
 
 void iris_hfi_gen2_sys_ops_init(struct iris_core *core);
+void iris_hfi_gen2_flush_debug_queue(struct iris_core *core, u8 *packet);
 void iris_hfi_gen2_response_handler(struct iris_core *core);
 
 #endif

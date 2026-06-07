@@ -82,6 +82,9 @@
 
 #define HFI_PROPERTY_SYS_CODEC_POWER_PLANE_CTRL		0x5
 #define HFI_PROPERTY_SYS_IMAGE_VERSION			0x6
+#define HFI_PROPERTY_SYS_DEBUG_CONFIG			0x1
+
+#define HFI_DEBUG_MODE_QUEUE				0x1
 
 #define HFI_PROPERTY_PARAM_FRAME_SIZE			0x1001
 #define HFI_PROPERTY_PARAM_UNCOMPRESSED_PLANE_ACTUAL_INFO	0x1002
@@ -191,6 +194,11 @@ struct hfi_sys_set_property_pkt {
 	struct hfi_pkt_hdr hdr;
 	u32 num_properties;
 	u32 data[];
+};
+
+struct hfi_debug_config {
+	u32 config;
+	u32 mode;
 };
 
 struct hfi_sys_get_property_pkt {

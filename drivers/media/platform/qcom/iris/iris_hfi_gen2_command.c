@@ -17,6 +17,9 @@
 #define SYS_IFPC_PKT_SIZE (sizeof(struct iris_hfi_header) + \
 	sizeof(struct iris_hfi_packet) + sizeof(u32))
 
+#define SYS_DEBUG_PKT_SIZE (sizeof(struct iris_hfi_header) + \
+	2 * (sizeof(struct iris_hfi_packet) + sizeof(u32)))
+
 #define SYS_NO_PAYLOAD_PKT_SIZE (sizeof(struct iris_hfi_header) + \
 	sizeof(struct iris_hfi_packet))
 
@@ -47,6 +50,23 @@ static int iris_hfi_gen2_sys_image_version(struct iris_core *core)
 		return -ENOMEM;
 
 	iris_hfi_gen2_packet_image_version(core, hdr);
+	ret = iris_hfi_queue_cmd_write_locked(core, hdr, hdr->size);
+
+	kfree(hdr);
+
+	return ret;
+}
+
+static int iris_hfi_gen2_sys_debug_config(struct iris_core *core)
+{
+	struct iris_hfi_header *hdr;
+	int ret;
+
+	hdr = kzalloc(SYS_DEBUG_PKT_SIZE, GFP_KERNEL);
+	if (!hdr)
+		return -ENOMEM;
+
+	iris_hfi_gen2_packet_sys_debug_config(core, hdr);
 	ret = iris_hfi_queue_cmd_write_locked(core, hdr, hdr->size);
 
 	kfree(hdr);
@@ -1392,9 +1412,11 @@ static struct iris_inst *iris_hfi_gen2_get_instance(void)
 static const struct iris_hfi_sys_ops iris_hfi_gen2_sys_ops = {
 	.sys_init = iris_hfi_gen2_sys_init,
 	.sys_image_version = iris_hfi_gen2_sys_image_version,
+	.sys_debug_config = iris_hfi_gen2_sys_debug_config,
 	.sys_interframe_powercollapse = iris_hfi_gen2_sys_interframe_powercollapse,
 	.sys_pc_prep = iris_hfi_gen2_sys_pc_prep,
 
+	.sys_flush_debug_queue = iris_hfi_gen2_flush_debug_queue,
 	.sys_hfi_response_handler = iris_hfi_gen2_response_handler,
 
 	.sys_get_instance = iris_hfi_gen2_get_instance,

@@ -53,6 +53,33 @@ static int iris_hfi_gen1_sys_image_version(struct iris_core *core)
 	return iris_hfi_queue_cmd_write_locked(core, &packet, packet.hdr.size);
 }
 
+static int iris_hfi_gen1_sys_debug_config(struct iris_core *core)
+{
+	struct hfi_sys_set_property_pkt *pkt;
+	struct hfi_debug_config *hfi;
+	u32 packet_size;
+	int ret;
+
+	packet_size = struct_size(pkt, data, 1) + sizeof(*hfi);
+	pkt = kzalloc(packet_size, GFP_KERNEL);
+	if (!pkt)
+		return -ENOMEM;
+
+	hfi = (struct hfi_debug_config *)&pkt->data[1];
+
+	pkt->hdr.size = packet_size;
+	pkt->hdr.pkt_type = HFI_CMD_SYS_SET_PROPERTY;
+	pkt->num_properties = 1;
+	pkt->data[0] = HFI_PROPERTY_SYS_DEBUG_CONFIG;
+	hfi->config = core->fw_debug_level;
+	hfi->mode = HFI_DEBUG_MODE_QUEUE;
+
+	ret = iris_hfi_queue_cmd_write_locked(core, pkt, pkt->hdr.size);
+	kfree(pkt);
+
+	return ret;
+}
+
 static int iris_hfi_gen1_sys_interframe_powercollapse(struct iris_core *core)
 {
 	struct hfi_sys_set_property_pkt *pkt;
@@ -1146,9 +1173,11 @@ static struct iris_inst *iris_hfi_gen1_get_instance(void)
 static const struct iris_hfi_sys_ops iris_hfi_gen1_sys_ops = {
 	.sys_init = iris_hfi_gen1_sys_init,
 	.sys_image_version = iris_hfi_gen1_sys_image_version,
+	.sys_debug_config = iris_hfi_gen1_sys_debug_config,
 	.sys_interframe_powercollapse = iris_hfi_gen1_sys_interframe_powercollapse,
 	.sys_pc_prep = iris_hfi_gen1_sys_pc_prep,
 
+	.sys_flush_debug_queue = iris_hfi_gen1_flush_debug_queue,
 	.sys_hfi_response_handler = iris_hfi_gen1_response_handler,
 
 	.sys_get_instance = iris_hfi_gen1_get_instance,

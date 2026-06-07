@@ -92,6 +92,10 @@ int iris_hfi_core_init(struct iris_core *core)
 	if (ret)
 		return ret;
 
+	ret = hfi_ops->sys_debug_config(core);
+	if (ret)
+		dev_warn(core->dev, "setting fw debug msg ON failed (%d)\n", ret);
+
 	return hfi_ops->sys_interframe_powercollapse(core);
 }
 

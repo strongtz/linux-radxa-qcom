@@ -280,6 +280,7 @@ static int iris_hfi_gen2_handle_system_error(struct iris_core *core,
 	if (pkt)
 		dev_err(core->dev, "received system error of type %#x\n", pkt->type);
 
+	iris_hfi_gen2_flush_debug_queue(core, core->debug_packet);
 	iris_hfi_sfr_print(core);
 
 	core->state = IRIS_CORE_ERROR;
@@ -988,18 +989,21 @@ static int iris_hfi_gen2_handle_response(struct iris_core *core, void *response)
 		return iris_hfi_gen2_handle_session_response(core, hdr);
 }
 
-static void iris_hfi_gen2_flush_debug_queue(struct iris_core *core, u8 *packet)
+void iris_hfi_gen2_flush_debug_queue(struct iris_core *core, u8 *packet)
 {
 	struct hfi_debug_header *pkt;
 	u8 *log;
 
+	if (!packet)
+		return;
+
 	while (!iris_hfi_queue_dbg_read(core, packet)) {
 		pkt = (struct hfi_debug_header *)packet;
 
-		if (pkt->size < sizeof(*pkt))
+		if (pkt->size <= sizeof(*pkt) + 1)
 			continue;
 
-		if (pkt->size >= IFACEQ_CORE_PKT_SIZE)
+		if (pkt->size >= IFACEQ_CORE_DBG_PKT_SIZE)
 			continue;
 
 		packet[pkt->size] = '\0';
@@ -1014,7 +1018,6 @@ void iris_hfi_gen2_response_handler(struct iris_core *core)
 		struct iris_hfi_packet pkt = {.type = HFI_SYS_ERROR_WD_TIMEOUT};
 
 		dev_err(core->dev, "cpu watchdog error received\n");
-		core->state = IRIS_CORE_ERROR;
 		iris_hfi_gen2_handle_system_error(core, &pkt);
 
 		return;
@@ -1026,5 +1029,5 @@ void iris_hfi_gen2_response_handler(struct iris_core *core)
 		memset(core->response_packet, 0, sizeof(struct iris_hfi_header));
 	}
 
-	iris_hfi_gen2_flush_debug_queue(core, core->response_packet);
+	iris_hfi_gen2_flush_debug_queue(core, core->debug_packet);
 }

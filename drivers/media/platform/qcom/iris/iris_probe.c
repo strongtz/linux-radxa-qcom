@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/debugfs.h>
 #include <linux/interconnect.h>
 #include <linux/module.h>
 #include <linux/pm_domain.h>
@@ -205,6 +206,8 @@ static void iris_remove(struct platform_device *pdev)
 	video_unregister_device(core->vdev_dec);
 	video_unregister_device(core->vdev_enc);
 
+	debugfs_remove_recursive(core->debugfs_root);
+
 	v4l2_device_unregister(&core->v4l2_dev);
 
 	mutex_destroy(&core->lock);
@@ -232,11 +235,16 @@ static int iris_probe(struct platform_device *pdev)
 	core->dev = dev;
 
 	core->state = IRIS_CORE_DEINIT;
+	core->fw_debug_level = IRIS_FW_DEBUG_LEVEL;
 	mutex_init(&core->lock);
 	init_completion(&core->core_init_done);
 
 	core->response_packet = devm_kzalloc(core->dev, IFACEQ_CORE_PKT_SIZE, GFP_KERNEL);
 	if (!core->response_packet)
+		return -ENOMEM;
+
+	core->debug_packet = devm_kzalloc(core->dev, IFACEQ_CORE_DBG_PKT_SIZE, GFP_KERNEL);
+	if (!core->debug_packet)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&core->instances);
@@ -297,6 +305,9 @@ static int iris_probe(struct platform_device *pdev)
 	ret = devm_pm_runtime_enable(core->dev);
 	if (ret)
 		goto err_vdev_unreg_enc;
+
+	core->debugfs_root = debugfs_create_dir("iris", NULL);
+	debugfs_create_x32("fw_level", 0644, core->debugfs_root, &core->fw_debug_level);
 
 	return 0;
 

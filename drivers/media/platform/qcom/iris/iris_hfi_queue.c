@@ -54,7 +54,8 @@ static int iris_hfi_queue_write(struct iris_iface_q_info *qinfo, void *packet, u
 	return 0;
 }
 
-static int iris_hfi_queue_read(struct iris_iface_q_info *qinfo, void *packet)
+static int iris_hfi_queue_read(struct iris_iface_q_info *qinfo, void *packet,
+			       u32 packet_size_max)
 {
 	struct iris_hfi_queue_header *queue = qinfo->qhdr;
 	u32 write_idx = queue->write_idx * sizeof(u32);
@@ -85,7 +86,7 @@ static int iris_hfi_queue_read(struct iris_iface_q_info *qinfo, void *packet)
 		return -EINVAL;
 
 	new_read_idx = read_idx + packet_size;
-	if (packet_size <= IFACEQ_CORE_PKT_SIZE) {
+	if (packet_size <= packet_size_max) {
 		if (new_read_idx < IFACEQ_QUEUE_SIZE) {
 			memcpy(packet, read_ptr, packet_size);
 		} else {
@@ -163,7 +164,7 @@ int iris_hfi_queue_msg_read(struct iris_core *core, void *pkt)
 		goto unlock;
 	}
 
-	if (iris_hfi_queue_read(q_info, pkt)) {
+	if (iris_hfi_queue_read(q_info, pkt, IFACEQ_CORE_PKT_SIZE)) {
 		ret = -ENODATA;
 		goto unlock;
 	}
@@ -180,12 +181,12 @@ int iris_hfi_queue_dbg_read(struct iris_core *core, void *pkt)
 	int ret = 0;
 
 	mutex_lock(&core->lock);
-	if (core->state != IRIS_CORE_INIT) {
+	if (core->state != IRIS_CORE_INIT && core->state != IRIS_CORE_ERROR) {
 		ret = -EINVAL;
 		goto unlock;
 	}
 
-	if (iris_hfi_queue_read(q_info, pkt)) {
+	if (iris_hfi_queue_read(q_info, pkt, IFACEQ_CORE_DBG_PKT_SIZE - 1)) {
 		ret = -ENODATA;
 		goto unlock;
 	}

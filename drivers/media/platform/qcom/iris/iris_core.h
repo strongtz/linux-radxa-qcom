@@ -24,6 +24,16 @@ struct icc_info {
 
 #define IRIS_FW_VERSION_LENGTH		128
 #define IFACEQ_CORE_PKT_SIZE		(1024 * 4)
+#define IFACEQ_CORE_DBG_PKT_SIZE	(1024 * 12)
+
+#define IRIS_FW_DEBUG_LOW		BIT(0)
+#define IRIS_FW_DEBUG_MED		BIT(1)
+#define IRIS_FW_DEBUG_HIGH		BIT(2)
+#define IRIS_FW_DEBUG_ERROR		BIT(3)
+#define IRIS_FW_DEBUG_FATAL		BIT(4)
+#define IRIS_FW_DEBUG_PERF		BIT(5)
+
+#define IRIS_FW_DEBUG_LEVEL		(IRIS_FW_DEBUG_ERROR | IRIS_FW_DEBUG_FATAL)
 
 enum domain_type {
 	ENCODER	= BIT(0),
@@ -67,8 +77,11 @@ struct qcom_ubwc_cfg_data;
  * @debug_queue: shared interface queue to receive debug info from firmware
  * @lock: a lock for this strucure
  * @response_packet: a pointer to response packet from fw to driver
+ * @debug_packet: a pointer to debug packet from fw to driver
  * @header_id: id of packet header
  * @packet_id: id of packet
+ * @fw_debug_level: firmware debug log level
+ * @debugfs_root: debugfs root directory
  * @power: a structure for clock and bw information
  * @hfi_sys_ops: iris HFI system ops
  * @core_init_done: structure of signal completion for system response
@@ -112,8 +125,11 @@ struct iris_core {
 	struct iris_iface_q_info		debug_queue;
 	struct mutex				lock; /* lock for core related operations */
 	u8					*response_packet;
+	u8					*debug_packet;
 	u32					header_id;
 	u32					packet_id;
+	u32					fw_debug_level;
+	struct dentry				*debugfs_root;
 	struct iris_core_power			power;
 	const struct iris_hfi_sys_ops		*hfi_sys_ops;
 	struct completion			core_init_done;

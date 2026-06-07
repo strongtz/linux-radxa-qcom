@@ -108,9 +108,11 @@ struct iris_hfi_prop_type_handle {
 struct iris_hfi_sys_ops {
 	int (*sys_init)(struct iris_core *core);
 	int (*sys_image_version)(struct iris_core *core);
+	int (*sys_debug_config)(struct iris_core *core);
 	int (*sys_interframe_powercollapse)(struct iris_core *core);
 	int (*sys_pc_prep)(struct iris_core *core);
 
+	void (*sys_flush_debug_queue)(struct iris_core *core, u8 *packet);
 	void (*sys_hfi_response_handler)(struct iris_core *core);
 
 	struct iris_inst *(*sys_get_instance)(void);

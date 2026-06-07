@@ -226,6 +226,33 @@ void iris_hfi_gen2_packet_image_version(struct iris_core *core, struct iris_hfi_
 				    NULL, 0);
 }
 
+void iris_hfi_gen2_packet_sys_debug_config(struct iris_core *core, struct iris_hfi_header *hdr)
+{
+	u32 payload;
+
+	iris_hfi_gen2_create_header(hdr, 0, core->header_id++);
+
+	payload = 0;
+	iris_hfi_gen2_create_packet(hdr,
+				    HFI_PROP_DEBUG_CONFIG,
+				    HFI_HOST_FLAGS_NONE,
+				    HFI_PAYLOAD_U32_ENUM,
+				    HFI_PORT_NONE,
+				    core->packet_id++,
+				    &payload,
+				    sizeof(u32));
+
+	payload = core->fw_debug_level;
+	iris_hfi_gen2_create_packet(hdr,
+				    HFI_PROP_DEBUG_LOG_LEVEL,
+				    HFI_HOST_FLAGS_NONE,
+				    HFI_PAYLOAD_U32_ENUM,
+				    HFI_PORT_NONE,
+				    core->packet_id++,
+				    &payload,
+				    sizeof(u32));
+}
+
 void iris_hfi_gen2_packet_session_command(struct iris_inst *inst, u32 pkt_type,
 					  u32 flags, u32 port, u32 session_id,
 					  u32 payload_type, void *payload,

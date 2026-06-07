@@ -14,6 +14,9 @@ void iris_core_deinit(struct iris_core *core)
 {
 	pm_runtime_resume_and_get(core->dev);
 
+	if (core->state != IRIS_CORE_DEINIT && core->hfi_sys_ops)
+		core->hfi_sys_ops->sys_flush_debug_queue(core, core->debug_packet);
+
 	mutex_lock(&core->lock);
 	if (core->state != IRIS_CORE_DEINIT) {
 		iris_fw_unload(core);
