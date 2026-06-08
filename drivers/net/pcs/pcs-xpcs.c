@@ -747,40 +747,6 @@ static void xpcs_pre_config(struct phylink_pcs *pcs, phy_interface_t interface)
 	xpcs->need_reset = false;
 }
 
-static int xpcs_config_operating_mode(struct dw_xpcs *xpcs, int an_mode)
-{
-	int mdio_stat2, ret;
-
-	switch (an_mode) {
-	case DW_AN_C37_SGMII:
-	case DW_AN_C37_1000BASEX:
-	case DW_2500BASEX:
-		mdio_stat2 = xpcs_read(xpcs, MDIO_MMD_PCS, MDIO_STAT2);
-		if (mdio_stat2 < 0)
-			return mdio_stat2;
-
-		/*
-		 * If this XPCS supports 10Gbase-R then it will be the default
-		 * which prevents 1000base-X and slower from working correctly.
-		 *
-		 * Why are we writing MDIO_PCS_CTRL2_TYPE + 1? We want the modal
-		 * behaviour that comes when we pick a reserved value. XPCS
-		 * allocates extra bits to this field and allocates values from
-		 * 15 down so MDIO_PCS_CTRL2_TYPE + 1 is the value likely to
-		 * be allocated last (and hopefully never).
-		 */
-		if (mdio_stat2 & MDIO_PCS_STAT2_10GBR) {
-			ret = xpcs_write(xpcs, MDIO_MMD_PCS, MDIO_CTRL2,
-					 MDIO_PCS_CTRL2_TYPE + 1);
-			if (ret < 0)
-				return ret;
-		}
-		break;
-	}
-
-	return 0;
-}
-
 static int xpcs_config_aneg_c37_sgmii(struct dw_xpcs *xpcs,
 				      unsigned int neg_mode)
 {
@@ -952,10 +918,6 @@ static int xpcs_do_config(struct dw_xpcs *xpcs, phy_interface_t interface,
 	compat = xpcs_find_compat(xpcs, interface);
 	if (!compat)
 		return -ENODEV;
-
-	ret = xpcs_config_operating_mode(xpcs, compat->an_mode);
-	if (ret < 0)
-		return ret;
 
 	if (xpcs->info.pma == WX_TXGBE_XPCS_PMA_10G_ID) {
 		/* Wangxun devices need backplane CL37 AN enabled for
@@ -1263,13 +1225,10 @@ static void xpcs_link_up_sgmii_1000basex(struct dw_xpcs *xpcs,
 					 phy_interface_t interface,
 					 int speed, int duplex)
 {
-	u16 an_enable;
 	int ret;
 
 	if (neg_mode == PHYLINK_PCS_NEG_INBAND_ENABLED)
 		return;
-
-	an_enable = (interface == PHY_INTERFACE_MODE_SGMII ? BMCR_ANENABLE : 0);
 
 	if (interface == PHY_INTERFACE_MODE_1000BASEX) {
 		if (speed != SPEED_1000) {
@@ -1286,7 +1245,7 @@ static void xpcs_link_up_sgmii_1000basex(struct dw_xpcs *xpcs,
 	}
 
 	ret = xpcs_write(xpcs, MDIO_MMD_VEND2, MII_BMCR,
-			 mii_bmcr_encode_fixed(speed, duplex) | an_enable);
+			 mii_bmcr_encode_fixed(speed, duplex));
 	if (ret)
 		dev_err(&xpcs->mdiodev->dev, "%s: xpcs_write returned %pe\n",
 			__func__, ERR_PTR(ret));

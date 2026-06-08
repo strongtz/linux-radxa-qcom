@@ -384,4 +384,3 @@ const struct stmmac_desc_ops dwxgmac210_desc_ops = {
 	.set_vlan = dwxgmac2_set_vlan,
 	.set_tbs = dwxgmac2_set_tbs,
 };
-EXPORT_SYMBOL_GPL(dwxgmac210_desc_ops);

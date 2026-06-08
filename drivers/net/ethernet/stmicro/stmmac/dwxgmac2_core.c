@@ -1561,7 +1561,6 @@ int dwxgmac2_setup(struct stmmac_priv *priv)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(dwxgmac2_setup);
 
 int dwxlgmac2_setup(struct stmmac_priv *priv)
 {
