@@ -595,10 +595,12 @@
 };
 
 &usb_0 {
+	status = "okay";
+};
+
+&usb_0_dwc3 {
 	/* TODO: Define USB-C connector properly */
 	dr_mode = "peripheral";
-
-	status = "okay";
 };
 
 &usb_0_hsphy {
@@ -617,10 +619,12 @@
 };
 
 &usb_1 {
+	status = "okay";
+};
+
+&usb_1_dwc3 {
 	/* TODO: Define USB-C connector properly */
 	dr_mode = "host";
-
-	status = "okay";
 };
 
 &usb_1_hsphy {

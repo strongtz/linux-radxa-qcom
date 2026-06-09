@@ -466,9 +466,11 @@
 };
 
 &usb_0 {
-	dr_mode = "peripheral";
-
 	status = "okay";
+};
+
+&usb_0_dwc3 {
+	dr_mode = "peripheral";
 };
 
 &usb_0_hsphy {
