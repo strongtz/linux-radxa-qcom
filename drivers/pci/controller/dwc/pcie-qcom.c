@@ -1534,7 +1534,8 @@ static int qcom_pcie_icc_init(struct qcom_pcie *pcie)
 	 * Set an initial peak bandwidth corresponding to single-lane Gen 1
 	 * for the pcie-mem path.
 	 */
-	ret = icc_set_bw(pcie->icc_mem, 0, QCOM_PCIE_LINK_SPEED_TO_BW(1));
+	ret = icc_set_bw(pcie->icc_mem, QCOM_PCIE_LINK_SPEED_TO_BW(1) / 2,
+			 QCOM_PCIE_LINK_SPEED_TO_BW(1));
 	if (ret) {
 		dev_err(pci->dev, "Failed to set bandwidth for PCIe-MEM interconnect path: %d\n",
 			ret);
@@ -1547,7 +1548,7 @@ static int qcom_pcie_icc_init(struct qcom_pcie *pcie)
 	 * HW team has recommended to use a minimal bandwidth of 1KBps just to
 	 * keep the path active.
 	 */
-	ret = icc_set_bw(pcie->icc_cpu, 0, kBps_to_icc(1));
+	ret = icc_set_bw(pcie->icc_cpu, kBps_to_icc(1) / 2, kBps_to_icc(1));
 	if (ret) {
 		dev_err(pci->dev, "Failed to set bandwidth for CPU-PCIe interconnect path: %d\n",
 			ret);
@@ -1560,7 +1561,7 @@ static int qcom_pcie_icc_init(struct qcom_pcie *pcie)
 
 static void qcom_pcie_icc_opp_update(struct qcom_pcie *pcie)
 {
-	u32 offset, status, width, speed;
+	u32 offset, status, width, speed, peak_bw;
 	struct dw_pcie *pci = pcie->pci;
 	struct dev_pm_opp_key key = {};
 	unsigned long freq_kbps;
@@ -1578,8 +1579,8 @@ static void qcom_pcie_icc_opp_update(struct qcom_pcie *pcie)
 	width = FIELD_GET(PCI_EXP_LNKSTA_NLW, status);
 
 	if (pcie->icc_mem) {
-		ret = icc_set_bw(pcie->icc_mem, 0,
-				 width * QCOM_PCIE_LINK_SPEED_TO_BW(speed));
+		peak_bw = width * QCOM_PCIE_LINK_SPEED_TO_BW(speed);
+		ret = icc_set_bw(pcie->icc_mem, peak_bw / 2, peak_bw);
 		if (ret) {
 			dev_err(pci->dev, "Failed to set bandwidth for PCIe-MEM interconnect path: %d\n",
 				ret);
@@ -2057,7 +2058,8 @@ static int qcom_pcie_suspend_noirq(struct device *dev)
 	 * suspend.
 	 */
 	if (pcie->icc_mem) {
-		ret = icc_set_bw(pcie->icc_mem, 0, kBps_to_icc(1));
+		ret = icc_set_bw(pcie->icc_mem, kBps_to_icc(1) / 2,
+				 kBps_to_icc(1));
 		if (ret) {
 			dev_err(dev,
 				"Failed to set bandwidth for PCIe-MEM interconnect path: %d\n",

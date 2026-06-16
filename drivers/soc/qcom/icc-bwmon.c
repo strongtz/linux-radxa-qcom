@@ -132,6 +132,8 @@
 #define BWMON_HAS_GLOBAL_IRQ			BIT(0)
 #define BWMON_NEEDS_FORCE_CLEAR			BIT(1)
 
+#define BWMON_FORCE_MAX_OPP_PROP		"qcom,force-max-opp"
+
 enum bwmon_fields {
 	/* Global region fields, keep them at the top */
 	F_GLOBAL_IRQ_CLEAR,
@@ -190,6 +192,7 @@ struct icc_bwmon {
 	unsigned int min_bw_kbps;
 	unsigned int target_kbps;
 	unsigned int current_kbps;
+	bool force_max_opp;
 };
 
 /* BWMON v4 */
@@ -601,6 +604,31 @@ static void bwmon_start(struct icc_bwmon *bwmon)
 	bwmon_enable(bwmon, BWMON_IRQ_ENABLE_MASK);
 }
 
+static int bwmon_set_max_opp(struct icc_bwmon *bwmon)
+{
+	struct dev_pm_opp *opp;
+	unsigned int bw_kbps = bwmon->max_bw_kbps;
+	int ret;
+
+	opp = dev_pm_opp_find_bw_floor(bwmon->dev, &bw_kbps, 0);
+	if (IS_ERR(opp))
+		return dev_err_probe(bwmon->dev, PTR_ERR(opp),
+				     "failed to find max peak bandwidth\n");
+
+	ret = dev_pm_opp_set_opp(bwmon->dev, opp);
+	dev_pm_opp_put(opp);
+	if (ret)
+		return dev_err_probe(bwmon->dev, ret,
+				     "failed to set max peak bandwidth\n");
+
+	bwmon->target_kbps = bw_kbps;
+	bwmon->current_kbps = bw_kbps;
+
+	dev_info(bwmon->dev, "Set max peak bandwidth to %u Kbps\n", bw_kbps);
+
+	return 0;
+}
+
 static irqreturn_t bwmon_intr(int irq, void *dev_id)
 {
 	struct icc_bwmon *bwmon = dev_id;
@@ -762,6 +790,8 @@ static int bwmon_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	bwmon->data = of_device_get_match_data(dev);
+	bwmon->force_max_opp = of_property_read_bool(dev->of_node,
+						     BWMON_FORCE_MAX_OPP_PROP);
 
 	ret = bwmon_init_regmap(pdev, bwmon);
 	if (ret)
@@ -790,6 +820,10 @@ static int bwmon_probe(struct platform_device *pdev)
 	bwmon->dev = dev;
 
 	bwmon_disable(bwmon);
+	platform_set_drvdata(pdev, bwmon);
+
+	if (bwmon->force_max_opp)
+		return bwmon_set_max_opp(bwmon);
 
 	/*
 	 * SoCs with multiple cpu-bwmon instances can end up using a shared interrupt
@@ -801,7 +835,6 @@ static int bwmon_probe(struct platform_device *pdev)
 	if (ret)
 		return dev_err_probe(dev, ret, "failed to request IRQ\n");
 
-	platform_set_drvdata(pdev, bwmon);
 	bwmon_start(bwmon);
 
 	return 0;
@@ -812,7 +845,8 @@ static void bwmon_remove(struct platform_device *pdev)
 	struct icc_bwmon *bwmon = platform_get_drvdata(pdev);
 
 	bwmon_disable(bwmon);
-	free_irq(bwmon->irq, bwmon);
+	if (!bwmon->force_max_opp)
+		free_irq(bwmon->irq, bwmon);
 }
 
 static const struct icc_bwmon_data msm8998_bwmon_data = {

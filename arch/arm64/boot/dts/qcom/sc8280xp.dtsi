@@ -3863,6 +3863,8 @@
 
 			operating-points-v2 = <&llcc_bwmon_opp_table>;
 
+			qcom,force-max-opp;
+
 			llcc_bwmon_opp_table: opp-table {
 				compatible = "operating-points-v2";
 
@@ -3916,6 +3918,7 @@
 
 			interconnects = <&gem_noc MASTER_APPSS_PROC 3 &gem_noc SLAVE_LLCC 3>;
 			operating-points-v2 = <&cpu_bwmon_opp_table>;
+			qcom,force-max-opp;
 
 			cpu_bwmon_opp_table: opp-table {
 				compatible = "operating-points-v2";
