@@ -506,6 +506,39 @@ static struct phylink_pcs *tc956x_select_pcs(struct stmmac_priv *priv,
 	return priv->hw->phylink_pcs;
 }
 
+static int tc956x_mac_finish(struct net_device *ndev, void *bsp_priv,
+			     unsigned int mode, phy_interface_t interface)
+{
+	struct tc956x_data *td = bsp_priv;
+	int speed;
+	int ret;
+
+	/*
+	 * fix_mac_speed() runs only after both the PHY and PCS report link up.
+	 * Program a usable host interface before then, otherwise a stale
+	 * 2500BASE-X selection prevents an SGMII PCS link and fix_mac_speed()
+	 * can never be reached.
+	 */
+	switch (interface) {
+	case PHY_INTERFACE_MODE_SGMII:
+		speed = SPEED_1000;
+		break;
+	case PHY_INTERFACE_MODE_2500BASEX:
+		speed = SPEED_2500;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	ret = tc956x_mac_configure(td, interface, speed);
+	if (ret)
+		return ret;
+
+	tc956x_pma_init(td);
+
+	return 0;
+}
+
 static void tc956x_fix_mac_speed(void *bsp_priv, int speed, unsigned int mode)
 {
 	struct tc956x_data *td = bsp_priv;
@@ -657,6 +690,7 @@ static int tc956x_plat_dat_init(struct tc956x_data *td)
 	}
 
 	plat->fix_mac_speed = tc956x_fix_mac_speed;
+	plat->mac_finish = tc956x_mac_finish;
 	plat->suspend = tc956x_dwmac_suspend;
 	plat->resume = tc956x_dwmac_resume;
 	plat->mac_setup = tc956x_mac_setup;
