@@ -1,0 +1,527 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2026 Radxa Computer (Shenzhen) Co., Ltd.
+ */
+
+/dts-v1/;
+
+#include "sc8280xp-radxa-rcore-q8280.dtsi"
+
+/ {
+	model = "Radxa DragonStation 6";
+	compatible = "radxa,dragonstation-6", "radxa,rcore-q8280", "qcom,sc8280xp";
+	chassis-type = "embedded";
+
+	dc_in_19v: regulator-dc-in-19v {
+		compatible = "regulator-fixed";
+
+		regulator-name = "dc_in_19v";
+		regulator-min-microvolt = <19000000>;
+		regulator-max-microvolt = <19000000>;
+
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vcc_3v3: regulator-vcc-3v3 {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vcc_3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vcc_1v8: regulator-vcc-1v8 {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vcc_1v8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&vcc_1v8a>;
+
+		gpio = <&tlmm 161 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		/* Longer delay for I2C pull-up to stabilize */
+		startup-delay-us = <50000>;
+
+		pinctrl-0 = <&vcc_1v8_reg_en>;
+		pinctrl-names = "default";
+	};
+
+	vcc_1v8a: regulator-vcc-1v8a {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vcc_1v8a";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+
+		gpio = <&pmc8280c_gpios 4 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
+		startup-delay-us = <1000>;
+
+		pinctrl-0 = <&eth_phy_pwr_en>;
+		pinctrl-names = "default";
+	};
+
+	vdd_usb2: regulator-vdd-usb2 {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vdd_usb2";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+
+		gpio = <&pmc8280c_gpios 5 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		startup-delay-us = <700>;
+
+		pinctrl-0 = <&usb2_reg_en>;
+		pinctrl-names = "default";
+
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vdd_usb3: regulator-vdd-usb3 {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vdd_usb3";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+
+		gpio = <&pmc8280c_gpios 6 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		startup-delay-us = <700>;
+
+		pinctrl-0 = <&usb3_reg_en>;
+		pinctrl-names = "default";
+
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vdd_ntn_core_0p9: regulator-vdd-ntn-core-0p9 {
+		compatible = "regulator-fixed";
+		regulator-name = "vdd_ntn_core_0p9";
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <900000>;
+		vin-supply = <&vcc_3v3>;
+	};
+
+};
+
+&i2c8 {
+	pinctrl-0 = <&qup_i2c8_data_clk>;
+	pinctrl-names = "default";
+
+	status = "okay";
+};
+
+&i2c21 {
+	pinctrl-0 = <&qup_i2c21_data_clk>;
+	pinctrl-names = "default";
+
+	status = "okay";
+};
+
+&pcie2a {
+	num-lanes = <2>;
+
+	pinctrl-0 = <&pcie2a_default>;
+	pinctrl-names = "default";
+
+	status = "okay";
+};
+
+&pcie2a_port0 {
+	reset-gpios = <&tlmm 143 GPIO_ACTIVE_LOW>;
+	wake-gpios = <&tlmm 145 GPIO_ACTIVE_LOW>;
+
+	pcie@0,0 {
+		compatible = "pci1179,0623";
+		reg = <0x10000 0x0 0x0 0x0 0x0>;
+		#address-cells = <3>;
+		#size-cells = <2>;
+
+		device_type = "pci";
+		ranges;
+		bus-range = <0x2 0xff>;
+
+		vddc-supply = <&vdd_ntn_core_0p9>;
+		vdd18-supply = <&vcc_1v8>;
+		vdd09-supply = <&vdd_ntn_core_0p9>;
+		vddio1-supply = <&vcc_1v8>;
+		vddio2-supply = <&vcc_1v8>;
+		vddio18-supply = <&vcc_1v8>;
+
+		i2c-parent = <&i2c8 0x77>;
+
+		resx-gpios = <&tlmm 131 GPIO_ACTIVE_LOW>;
+
+		pinctrl-0 = <&tc9563_2_resx_n>;
+		pinctrl-names = "default";
+
+		pcie@1,0 {
+			reg = <0x20800 0x0 0x0 0x0 0x0>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			device_type = "pci";
+			ranges;
+			bus-range = <0x3 0xff>;
+
+			status = "okay";
+		};
+
+		pcie@2,0 {
+			reg = <0x21000 0x0 0x0 0x0 0x0>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			device_type = "pci";
+			ranges;
+			bus-range = <0x4 0xff>;
+
+			status = "okay";
+		};
+
+		pcie@3,0 {
+			compatible = "pciclass,0604";
+			reg = <0x21800 0x0 0x0 0x0 0x0>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			device_type = "pci";
+			ranges;
+			bus-range = <0x5 0xff>;
+
+			qps615_2_emac0: pci@0,0 {
+				compatible = "pci1179,0220";
+				reg = <0x50000 0x0 0x0 0x0 0x0>;
+				#address-cells = <3>;
+				#size-cells = <2>;
+				device_type = "pci";
+				ranges;
+
+				gpio-controller;
+				#gpio-cells = <2>;
+			};
+
+			qps615_2_emac1: pci@0,1 {
+				compatible = "pci1179,0220";
+				reg = <0x50100 0x0 0x0 0x0 0x0>;
+				#address-cells = <3>;
+				#size-cells = <2>;
+				device_type = "pci";
+				ranges;
+
+				gpio-controller;
+				#gpio-cells = <2>;
+
+				phy-mode = "usxgmii";
+				phy-handle = <&qps615_2_emac1_phy>;
+
+				nvmem-cells = <&mac_addr1>;
+				nvmem-cell-names = "mac-address";
+
+				mdio {
+					compatible = "snps,dwmac-mdio";
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reset-gpios = <&qps615_2_emac0 1 GPIO_ACTIVE_LOW>;
+					reset-delay-us = <200000>;
+					reset-post-delay-us = <350000>;
+
+					qps615_2_emac1_phy: ethernet-phy@7 {
+						compatible = "ethernet-phy-id7500.94a1",
+							     "ethernet-phy-ieee802.3-c45";
+						reg = <0x7>;
+						firmware-name = "as21x1x_fw.bin";
+					};
+				};
+			};
+		};
+	};
+};
+
+&pcie2a_phy {
+	vdda-phy-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l4d>;
+
+	status = "okay";
+};
+
+&pcie3a {
+	num-lanes = <2>;
+
+	pinctrl-0 = <&pcie3a_default>;
+	pinctrl-names = "default";
+
+	status = "okay";
+};
+
+&pcie3a_port0 {
+	reset-gpios = <&tlmm 151 GPIO_ACTIVE_LOW>;
+	wake-gpios = <&tlmm 148 GPIO_ACTIVE_LOW>;
+
+	pcie@0,0 {
+		compatible = "pci1179,0623";
+		reg = <0x10000 0x0 0x0 0x0 0x0>;
+		#address-cells = <3>;
+		#size-cells = <2>;
+
+		device_type = "pci";
+		ranges;
+		bus-range = <0x2 0xff>;
+
+		vddc-supply = <&vdd_ntn_core_0p9>;
+		vdd18-supply = <&vcc_1v8>;
+		vdd09-supply = <&vdd_ntn_core_0p9>;
+		vddio1-supply = <&vcc_1v8>;
+		vddio2-supply = <&vcc_1v8>;
+		vddio18-supply = <&vcc_1v8>;
+
+		i2c-parent = <&i2c21 0x77>;
+
+		resx-gpios = <&tlmm 108 GPIO_ACTIVE_LOW>;
+
+		pinctrl-0 = <&tc9563_resx_n>;
+		pinctrl-names = "default";
+
+		pcie@1,0 {
+			reg = <0x20800 0x0 0x0 0x0 0x0>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			device_type = "pci";
+			ranges;
+			bus-range = <0x3 0xff>;
+
+			status = "okay";
+		};
+
+		pcie@2,0 {
+			reg = <0x21000 0x0 0x0 0x0 0x0>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			device_type = "pci";
+			ranges;
+			bus-range = <0x4 0xff>;
+
+			status = "okay";
+		};
+
+		pcie@3,0 {
+			compatible = "pciclass,0604";
+			reg = <0x21800 0x0 0x0 0x0 0x0>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			device_type = "pci";
+			ranges;
+			bus-range = <0x5 0xff>;
+
+			qps615_1_emac0: pci@0,0 {
+				compatible = "pci1179,0220";
+				reg = <0x50000 0x0 0x0 0x0 0x0>;
+				#address-cells = <3>;
+				#size-cells = <2>;
+				device_type = "pci";
+				ranges;
+
+				gpio-controller;
+				#gpio-cells = <2>;
+			};
+
+			qps615_1_emac1: pci@0,1 {
+				compatible = "pci1179,0220";
+				reg = <0x50100 0x0 0x0 0x0 0x0>;
+				#address-cells = <3>;
+				#size-cells = <2>;
+				device_type = "pci";
+				ranges;
+
+				gpio-controller;
+				#gpio-cells = <2>;
+
+				phy-mode = "usxgmii";
+				phy-handle = <&qps615_1_emac1_phy>;
+
+				nvmem-cells = <&mac_addr0>;
+				nvmem-cell-names = "mac-address";
+
+				mdio {
+					compatible = "snps,dwmac-mdio";
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reset-gpios = <&qps615_1_emac0 1 GPIO_ACTIVE_LOW>;
+					reset-delay-us = <200000>;
+					reset-post-delay-us = <350000>;
+
+					qps615_1_emac1_phy: ethernet-phy@7 {
+						compatible = "ethernet-phy-id7500.94a1",
+							     "ethernet-phy-ieee802.3-c45";
+						reg = <0x7>;
+						firmware-name = "as21x1x_fw.bin";
+					};
+				};
+			};
+		};
+	};
+};
+
+&pcie3a_phy {
+	vdda-phy-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l4d>;
+
+	status = "okay";
+};
+
+&usb_2 {
+	status = "okay";
+};
+
+&usb_2_hsphy0 {
+	status = "okay";
+};
+
+&usb_2_hsphy1 {
+	status = "okay";
+};
+
+&usb_2_hsphy2 {
+	status = "okay";
+};
+
+&usb_2_hsphy3 {
+	status = "okay";
+};
+
+&usb_2_qmpphy0 {
+	status = "okay";
+};
+
+&usb_2_qmpphy1 {
+	status = "okay";
+};
+
+&ufs_mem_hc {
+	reset-gpios = <&tlmm 228 GPIO_ACTIVE_LOW>;
+
+	vcc-supply = <&vcc_ufs>;
+	vcc-max-microamp = <1100000>;
+	vccq-supply = <&vreg_l3d>;
+	vccq-max-microamp = <1200000>;
+
+	limit-hs-gear = <3>;
+
+	status = "okay";
+};
+
+&ufs_mem_phy {
+	status = "okay";
+};
+
+&qup_i2c8_data_clk {
+	drive-strength = <2>;
+	bias-disable;
+};
+
+&qup_i2c21_data_clk {
+	drive-strength = <2>;
+	bias-disable;
+};
+
+&pmc8280c_gpios {
+	eth_phy_pwr_en: eth-phy-pwr-en-state {
+		pins = "gpio4";
+		function = "normal";
+	};
+
+	usb2_reg_en: usb2-reg-en-state {
+		pins = "gpio5";
+		function = "normal";
+	};
+
+	usb3_reg_en: usb3-reg-en-state {
+		pins = "gpio6";
+		function = "normal";
+	};
+
+};
+
+&tlmm {
+	vcc_1v8_reg_en: vcc-1v8-reg-en-state {
+		pins = "gpio161";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	tc9563_resx_n: tc9563-resx-state {
+		pins = "gpio108";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	tc9563_2_resx_n: tc9563-2-resx-state {
+		pins = "gpio131";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	pcie2a_default: pcie2a-default-state {
+		clkreq-n-pins {
+			pins = "gpio142";
+			function = "pcie2a_clkreq";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+
+		perst-n-pins {
+			pins = "gpio143";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		wake-n-pins {
+			pins = "gpio145";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+	};
+
+	pcie3a_default: pcie3a-default-state {
+		clkreq-n-pins {
+			pins = "gpio150";
+			function = "pcie3a_clkreq";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+
+		perst-n-pins {
+			pins = "gpio151";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		wake-n-pins {
+			pins = "gpio148";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+	};
+
+};
