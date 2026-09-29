@@ -1835,13 +1835,19 @@ static int msm_dp_ctrl_enable_mainlink_clocks(struct msm_dp_ctrl_private *ctrl,
 	ctrl->phy_opts.dp.link_rate = ctrl->link->link_params.rate / 100;
 	ctrl->phy_opts.dp.ssc = drm_dp_max_downspread(dpcd);
 
-	phy_configure(phy, &ctrl->phy_opts);
-	phy_power_on(phy);
+	ret = phy_configure(phy, &ctrl->phy_opts);
+	if (ret)
+		return ret;
+	ret = phy_power_on(phy);
+	if (ret)
+		return ret;
 
 	dev_pm_opp_set_rate(ctrl->dev, ctrl->link->link_params.rate * 1000);
 	ret = msm_dp_ctrl_link_clk_enable(&ctrl->msm_dp_ctrl);
-	if (ret)
+	if (ret) {
 		DRM_ERROR("Unable to start link clocks. ret=%d\n", ret);
+		phy_power_off(phy);
+	}
 
 	drm_dbg_dp(ctrl->drm_dev, "link rate=%d\n", ctrl->link->link_params.rate);
 
@@ -2558,8 +2564,11 @@ int msm_dp_ctrl_prepare_stream_on(struct msm_dp_ctrl *msm_dp_ctrl,
 		}
 	}
 
-	if (force_link_train || !msm_dp_ctrl_channel_eq_ok(ctrl))
-		msm_dp_ctrl_link_retrain(ctrl, panel);
+	if (force_link_train || !msm_dp_ctrl_channel_eq_ok(ctrl)) {
+		ret = msm_dp_ctrl_link_retrain(ctrl, panel);
+		if (ret)
+			return ret;
+	}
 
 	/* stop txing train pattern to end link training */
 	msm_dp_ctrl_clear_training_pattern(ctrl, panel, DP_PHY_DPRX);

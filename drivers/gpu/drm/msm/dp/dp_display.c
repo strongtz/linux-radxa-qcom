@@ -52,6 +52,8 @@ struct msm_dp_display_private {
 	bool core_initialized;
 	bool phy_initialized;
 	bool audio_supported;
+	bool stream_pm_active;
+	bool stream_link_active;
 
 	struct mutex plugged_lock;
 	bool plugged;
@@ -625,14 +627,19 @@ static int msm_dp_display_prepare_link(struct msm_dp_display_private *dp)
 
 	drm_dbg_dp(dp->drm_dev, "sink_count=%d\n", dp->link->sink_count);
 
-	if (msm_dp_display->is_edp)
-		msm_dp_hpd_plug_handle(dp);
+	if (msm_dp_display->is_edp) {
+		rc = msm_dp_hpd_plug_handle(dp);
+		if (rc)
+			return rc;
+	}
 
 	rc = pm_runtime_resume_and_get(&msm_dp_display->pdev->dev);
 	if (rc) {
 		DRM_ERROR("failed to pm_runtime_resume\n");
 		return rc;
 	}
+
+	dp->stream_pm_active = true;
 
 	if (dp->link->sink_count == 0)
 		return -ENOTCONN;
@@ -645,9 +652,10 @@ static int msm_dp_display_prepare_link(struct msm_dp_display_private *dp)
 	rc = msm_dp_ctrl_on_link(dp->ctrl, dp->panel);
 	if (rc) {
 		DRM_ERROR("Failed link training (rc=%d)\n", rc);
-		// TODO: schedule drm_connector_set_link_status_property()
 		return rc;
 	}
+
+	dp->stream_link_active = true;
 
 	return msm_dp_ctrl_prepare_stream_on(dp->ctrl, dp->panel, force_link_train);
 }
@@ -727,6 +735,7 @@ static int msm_dp_display_disable(struct msm_dp_display_private *dp,
 		msm_dp_link_psm_config(dp->link, &msm_dp_panel->link_info, true);
 
 	msm_dp_ctrl_off_link(dp->ctrl, msm_dp_panel);
+	dp->stream_link_active = false;
 
 	if (dp->link->sink_count == 0)
 		/* re-init the PHY so that we can listen to Dongle disconnect */
@@ -1428,6 +1437,25 @@ void msm_dp_display_atomic_pre_enable(struct msm_dp *msm_dp_display,
 	msm_dp_display_set_mode(msm_dp_display, &crtc_state->adjusted_mode, dp->panel);
 }
 
+static void msm_dp_display_abort_enable(struct msm_dp_display_private *dp)
+{
+	if (dp->stream_link_active) {
+		msm_dp_ctrl_off_pixel_clk(dp->ctrl);
+		msm_dp_ctrl_off_link(dp->ctrl, dp->panel);
+		dp->stream_link_active = false;
+	}
+	msm_dp_display_host_phy_exit(dp);
+	dp->msm_dp_display.power_on = false;
+
+	if (dp->msm_dp_display.is_edp)
+		msm_dp_hpd_unplug_handle(dp);
+
+	if (dp->stream_pm_active) {
+		pm_runtime_put_sync(&dp->msm_dp_display.pdev->dev);
+		dp->stream_pm_active = false;
+	}
+}
+
 void msm_dp_display_atomic_enable(struct msm_dp *msm_dp_display,
 				  struct drm_atomic_commit *state)
 {
@@ -1439,20 +1467,26 @@ void msm_dp_display_atomic_enable(struct msm_dp *msm_dp_display,
 	rc = msm_dp_display_prepare_link(dp);
 	if (rc) {
 		DRM_ERROR("DP display prepare failed, rc=%d\n", rc);
-		return;
+		goto err;
 	}
 
 	rc = msm_dp_display_enable(dp, dp->panel);
-	if (rc)
+	if (rc) {
 		DRM_ERROR("DP display enable failed, rc=%d\n", rc);
+		goto err;
+	}
 
 	rc = msm_dp_display_post_enable(msm_dp_display);
 	if (rc) {
 		DRM_ERROR("DP display post enable failed, rc=%d\n", rc);
-		msm_dp_display_disable(dp, dp->panel);
+		goto err;
 	}
 
 	drm_dbg_dp(msm_dp_display->drm_dev, "type=%d Done\n", msm_dp_display->connector_type);
+	return;
+
+err:
+	msm_dp_display_abort_enable(dp);
 }
 
 void msm_dp_display_atomic_disable(struct msm_dp *dp)
@@ -1482,7 +1516,10 @@ static void msm_dp_display_unprepare(struct msm_dp_display_private *dp)
 {
 	struct msm_dp *msm_dp_display = &dp->msm_dp_display;
 
-	pm_runtime_put_sync(&msm_dp_display->pdev->dev);
+	if (dp->stream_pm_active) {
+		pm_runtime_put_sync(&msm_dp_display->pdev->dev);
+		dp->stream_pm_active = false;
+	}
 
 	drm_dbg_dp(dp->drm_dev, "type=%d Done\n", msm_dp_display->connector_type);
 }
