@@ -628,7 +628,10 @@ static int msm_dp_display_set_mode(struct msm_dp *msm_dp_display,
 	else
 		bpp = state->bpp;
 
-	msm_dp_panel->sdp_needs_flush = msm_dp_panel->vsc_enabled || state->vsc_enabled;
+	msm_dp_panel->sdp_needs_flush = msm_dp_panel->vsc_enabled || state->vsc_enabled ||
+		msm_dp_panel->hdr_enabled || state->hdr_enabled;
+	msm_dp_panel->hdr_enabled = state->hdr_enabled;
+	msm_dp_panel->hdr_sdp = state->hdr_sdp;
 	msm_dp_panel->colorspace = state->colorspace;
 	msm_dp_panel->vsc_enabled = state->vsc_enabled;
 	msm_dp_panel->vsc_sdp = state->vsc_sdp;
@@ -648,7 +651,7 @@ int msm_dp_display_atomic_check(struct msm_dp *msm_dp_display,
 	const struct drm_display_info *info = &conn_state->connector->display_info;
 	struct msm_dp_display_private *dp;
 	unsigned int clock = mode->clock;
-	int bpp;
+	int bpp, ret;
 
 	dp = container_of(msm_dp_display, struct msm_dp_display_private, msm_dp_display);
 
@@ -657,17 +660,27 @@ int msm_dp_display_atomic_check(struct msm_dp *msm_dp_display,
 
 	guard(mutex)(&dp->plugged_lock);
 
+	ret = msm_dp_utils_pack_hdr_sdp(conn_state, &state->hdr_sdp);
+	if (ret)
+		return ret;
+
+	state->hdr_enabled = !!conn_state->hdr_output_metadata;
+	if (state->hdr_enabled && dp->panel->video_test)
+		return -EINVAL;
 	bpp = msm_dp_utils_select_bpp(info->bpc, conn_state->max_requested_bpc,
 				      clock, dp->panel->link_caps_valid ?
 				      dp->panel->link_info.rate : 0,
-				      dp->panel->link_info.num_lanes);
+				      dp->panel->link_info.num_lanes,
+				      state->hdr_enabled && state->hdr_sdp.db[2] !=
+				      HDMI_EOTF_TRADITIONAL_GAMMA_SDR);
 	if (bpp < 0)
 		return bpp;
 
 	state->bpp = bpp;
 	state->colorspace = conn_state->colorspace;
 	state->vsc_enabled = drm_mode_is_420_only(info, mode) ||
-			     state->colorspace != DRM_MODE_COLORIMETRY_DEFAULT;
+			     state->colorspace != DRM_MODE_COLORIMETRY_DEFAULT ||
+			     state->hdr_enabled;
 	if (!state->vsc_enabled)
 		return 0;
 
@@ -699,6 +712,18 @@ static int msm_dp_display_prepare_link(struct msm_dp_display_private *dp)
 	}
 
 	dp->stream_pm_active = true;
+
+	if (dp->panel->hdr_enabled) {
+		const struct drm_display_info *info = &msm_dp_display->connector->display_info;
+		const struct hdr_static_metadata *hdr = &info->hdr_sink_metadata.hdmi_type1;
+		u8 eotf = dp->panel->hdr_sdp.db[2];
+
+		if (dp->panel->hw_revision < DP_HW_VERSION_1_0 ||
+		    !(hdr->metadata_type & BIT(HDMI_STATIC_METADATA_TYPE1)) ||
+		    !(hdr->eotf & BIT(eotf)) ||
+		    (eotf != HDMI_EOTF_TRADITIONAL_GAMMA_SDR && info->bpc < 10))
+			return -EINVAL;
+	}
 
 	if (dp->panel->vsc_enabled && !dp->panel->vsc_sdp_supported)
 		return -EINVAL;
@@ -789,6 +814,7 @@ static int msm_dp_display_disable(struct msm_dp_display_private *dp,
 		return 0;
 
 	msm_dp_panel_disable_vsc_sdp(msm_dp_panel);
+	msm_dp_panel_disable_hdr_sdp(msm_dp_panel);
 
 	msm_dp_ctrl_off_pixel_clk(dp->ctrl);
 
