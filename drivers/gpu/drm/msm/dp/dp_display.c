@@ -27,6 +27,7 @@
 #include "dp_panel.h"
 #include "dp_display.h"
 #include "dp_drm.h"
+#include "dp_utils.h"
 #include "dp_audio.h"
 #include "dp_debug.h"
 
@@ -614,7 +615,8 @@ error:
 
 static int msm_dp_display_set_mode(struct msm_dp *msm_dp_display,
 				   const struct drm_display_mode *adjusted_mode,
-				   struct msm_dp_panel *msm_dp_panel)
+				   struct msm_dp_panel *msm_dp_panel,
+				   const struct msm_dp_bridge_state *state)
 {
 	struct msm_dp_display_private *dp;
 	u32 bpp;
@@ -624,13 +626,41 @@ static int msm_dp_display_set_mode(struct msm_dp *msm_dp_display,
 	if (msm_dp_display_check_video_test(msm_dp_display))
 		bpp = msm_dp_display_get_test_bpp(msm_dp_display);
 	else
-		bpp = msm_dp_panel->connector->display_info.bpc * 3;
+		bpp = state->bpp;
 
 	msm_dp_panel_init_panel_info(msm_dp_panel, adjusted_mode, bpp ? bpp : 24);
 
 	/* populate wide_bus_support to different layers */
 	dp->ctrl->wide_bus_en =
 		msm_dp_panel->msm_dp_mode.out_fmt_is_yuv_420 ? false : dp->wide_bus_supported;
+	return 0;
+}
+
+int msm_dp_display_atomic_check(struct msm_dp *msm_dp_display,
+				struct msm_dp_bridge_state *state,
+				const struct drm_display_mode *mode,
+				const struct drm_connector_state *conn_state)
+{
+	const struct drm_display_info *info = &conn_state->connector->display_info;
+	struct msm_dp_display_private *dp;
+	unsigned int clock = mode->clock;
+	int bpp;
+
+	dp = container_of(msm_dp_display, struct msm_dp_display_private, msm_dp_display);
+
+	if (drm_mode_is_420_only(info, mode))
+		clock /= 2;
+
+	guard(mutex)(&dp->plugged_lock);
+
+	bpp = msm_dp_utils_select_bpp(info->bpc, conn_state->max_requested_bpc,
+				      clock, dp->panel->link_caps_valid ?
+				      dp->panel->link_info.rate : 0,
+				      dp->panel->link_info.num_lanes);
+	if (bpp < 0)
+		return bpp;
+
+	state->bpp = bpp;
 	return 0;
 }
 
@@ -1450,7 +1480,9 @@ void msm_dp_display_atomic_pre_enable(struct msm_dp *msm_dp_display,
 	 * state and runs before the bridge's .atomic_enable(), so the mode must
 	 * be programmed here, in .atomic_pre_enable().
 	 */
-	msm_dp_display_set_mode(msm_dp_display, &crtc_state->adjusted_mode, dp->panel);
+	msm_dp_display_set_mode(msm_dp_display, &crtc_state->adjusted_mode, dp->panel,
+		to_dp_bridge_state(drm_atomic_get_new_bridge_state(state,
+							  msm_dp_display->bridge)));
 }
 
 static void msm_dp_display_abort_enable(struct msm_dp_display_private *dp)
