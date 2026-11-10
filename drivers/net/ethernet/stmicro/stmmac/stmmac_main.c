@@ -4558,6 +4558,7 @@ static netdev_tx_t stmmac_tso_xmit(struct sk_buff *skb, struct net_device *dev)
 				   "%s: Tx Ring full when queue awake\n",
 				   __func__);
 		}
+		stmmac_flush_tx_descriptors(priv, queue);
 		return NETDEV_TX_BUSY;
 	}
 
@@ -4756,6 +4757,7 @@ error:
 	dev_err(priv->device, "Tx dma map failed\n");
 	dev_kfree_skb(skb);
 	priv->xstats.tx_dropped++;
+	stmmac_flush_tx_descriptors(priv, queue);
 	return NETDEV_TX_OK;
 }
 
@@ -4791,7 +4793,7 @@ static bool stmmac_has_ip_ethertype(struct sk_buff *skb)
  */
 static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	bool enh_desc, has_vlan, set_ic, is_jumbo = false;
+	bool enh_desc, has_vlan, set_ic, kick, is_jumbo = false;
 	struct stmmac_priv *priv = netdev_priv(dev);
 	unsigned int nopaged_len = skb_headlen(skb);
 	u32 queue = skb_get_queue_mapping(skb);
@@ -4832,6 +4834,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 				   "%s: Tx Ring full when queue awake\n",
 				   __func__);
 		}
+		stmmac_flush_tx_descriptors(priv, queue);
 		return NETDEV_TX_BUSY;
 	}
 
@@ -5000,11 +5003,13 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	 */
 	stmmac_set_tx_owner(priv, first_desc);
 
-	netdev_tx_sent_queue(netdev_get_tx_queue(dev, queue), skb->len);
+	kick = __netdev_tx_sent_queue(netdev_get_tx_queue(dev, queue),
+				      skb->len, netdev_xmit_more());
 
 	stmmac_enable_dma_transmission(priv, priv->ioaddr, queue);
 	skb_tx_timestamp(skb);
-	stmmac_flush_tx_descriptors(priv, queue);
+	if (kick)
+		stmmac_flush_tx_descriptors(priv, queue);
 	stmmac_tx_timer_arm(priv, queue);
 
 	return NETDEV_TX_OK;
@@ -5014,6 +5019,7 @@ dma_map_err:
 max_sdu_err:
 	dev_kfree_skb(skb);
 	priv->xstats.tx_dropped++;
+	stmmac_flush_tx_descriptors(priv, queue);
 	return NETDEV_TX_OK;
 }
 
