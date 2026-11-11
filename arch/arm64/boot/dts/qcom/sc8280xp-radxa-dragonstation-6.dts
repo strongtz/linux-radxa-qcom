@@ -231,6 +231,7 @@
 
 				mdio {
 					compatible = "snps,dwmac-mdio";
+					clock-frequency = <10000000>;
 					#address-cells = <1>;
 					#size-cells = <0>;
 					reset-gpios = <&qps615_2_emac0 1 GPIO_ACTIVE_LOW>;
@@ -358,6 +359,7 @@
 
 				mdio {
 					compatible = "snps,dwmac-mdio";
+					clock-frequency = <10000000>;
 					#address-cells = <1>;
 					#size-cells = <0>;
 					reset-gpios = <&qps615_1_emac0 1 GPIO_ACTIVE_LOW>;
