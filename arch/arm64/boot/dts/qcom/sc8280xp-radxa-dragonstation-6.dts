@@ -223,7 +223,7 @@
 				gpio-controller;
 				#gpio-cells = <2>;
 
-				phy-mode = "usxgmii";
+				phy-mode = "10gbase-r";
 				phy-handle = <&qps615_2_emac1_phy>;
 
 				nvmem-cells = <&mac_addr1>;
@@ -350,7 +350,7 @@
 				gpio-controller;
 				#gpio-cells = <2>;
 
-				phy-mode = "usxgmii";
+				phy-mode = "10gbase-r";
 				phy-handle = <&qps615_1_emac1_phy>;
 
 				nvmem-cells = <&mac_addr0>;
